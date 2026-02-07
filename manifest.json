@@ -1,6 +1,6 @@
 {
-  "name": "Zapi AIProduction",
-  "short_name": "ZapiGame",
+  "name": "Zapi Production",
+  "short_name": "KALKUL 1.01",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
@@ -10,3 +10,4 @@
     { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
+
