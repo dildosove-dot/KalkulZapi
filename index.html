@@ -1,0 +1,359 @@
+﻿<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zapi Production</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: black;
+            color: white;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: black;
+        }
+
+        /* ===== INTRO ===== */
+        #intro {
+            position: fixed;
+            inset: 0;
+            background: black;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #logo {
+            font-size: 48px;
+            font-weight: bold;
+            color: gold;
+            opacity: 0;
+            transition: opacity 2s;
+        }
+
+        #subtext {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            opacity: 0;
+        }
+
+            #subtext span {
+                font-size: 32px;
+                font-weight: bold;
+                color: white;
+            }
+
+        #intro svg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* ===== KALKULAČKA ===== */
+        #calculator {
+            display: none;
+            width: 260px;
+            margin: 40px auto;
+            background: #1c1c1c;
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        #display {
+            width: 100%;
+            height: 50px;
+            font-size: 24px;
+            text-align: right;
+            margin-bottom: 10px;
+            padding-right: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 8px;
+        }
+
+        button {
+            height: 55px;
+            font-size: 18px;
+            border-radius: 8px;
+        }
+
+        /* ===== HRA ===== */
+        #game {
+            display: none;
+            text-align: center;
+            position: relative;
+        }
+
+        #score, #best-score {
+            margin: 10px;
+        }
+
+        #hint {
+            font-size: 16px;
+            opacity: 0.7;
+        }
+
+        #game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            font-size: 64px;
+            color: red;
+            font-family: monospace;
+            text-shadow: 2px 2px 0 black;
+        }
+
+        #reset-btn {
+            display: none;
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- INTRO -->
+    <div id="intro">
+        <div id="logo">Zapi</div>
+        <div id="subtext">
+            <span id="ai">Pičo!</span>
+            <span id="production">Production</span>
+        </div>
+        <svg>
+            <polyline id="lightning1" points="0,0 0,0" stroke="white" stroke-width="4" fill="none" />
+            <polyline id="lightning2" points="0,0 0,0" stroke="red" stroke-width="4" fill="none" />
+        </svg>
+    </div>
+
+    <!-- KALKULAČKA -->
+    <div id="calculator">
+        <input id="display" readonly>
+        <div class="grid">
+            <button type="button" onclick="clearDisp()">C</button>
+            <button type="button" onclick="add('/')">÷</button>
+            <button type="button" onclick="add('*')">×</button>
+            <button type="button" onclick="add('-')">−</button>
+            <button type="button" onclick="add('7')">7</button>
+            <button type="button" onclick="add('8')">8</button>
+            <button type="button" onclick="add('9')">9</button>
+            <button type="button" onclick="add('+')">+</button>
+            <button type="button" onclick="add('4')">4</button>
+            <button type="button" onclick="add('5')">5</button>
+            <button type="button" onclick="add('6')">6</button>
+            <button type="button" onclick="equals()">=</button>
+            <button type="button" onclick="add('1')">1</button>
+            <button type="button" onclick="add('2')">2</button>
+            <button type="button" onclick="add('3')">3</button>
+            <button type="button" onclick="add('0')" style="grid-column: span 2;">0</button>
+            <button type="button" onclick="add('.')">.</button>
+        </div>
+    </div>
+
+    <!-- HRA -->
+    <div id="game">
+        <div id="score">Skóre: 0</div>
+        <div id="best-score">Nejlepší: 0</div>
+        <div id="hint">Stiskni skok pro start</div>
+        <canvas id="canvas" width="300" height="500"></canvas>
+        <div id="game-over">GAME OVER</div>
+        <button id="reset-btn" onclick="resetGame()">Restart</button>
+    </div>
+
+    <script>
+// ===== ELEMENTY =====
+const intro = document.getElementById("intro");
+const logo = document.getElementById("logo");
+const subtext = document.getElementById("subtext");
+const ai = document.getElementById("ai");
+const production = document.getElementById("production");
+const lightning1 = document.getElementById("lightning1");
+const lightning2 = document.getElementById("lightning2");
+const calculator = document.getElementById("calculator");
+const game = document.getElementById("game");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best-score");
+const hint = document.getElementById("hint");
+const gameOverEl = document.getElementById("game-over");
+const resetBtn = document.getElementById("reset-btn");
+let display = document.getElementById("display");
+
+// ===== INTRO ANIMACE =====
+function drawLightning(poly,color){
+    const points=[[250,50],[150,150],[200,250],[100,350],[150,450]];
+    poly.setAttribute("points",points.map(p=>p.join(",")).join(" "));
+    poly.setAttribute("stroke",color);
+}
+
+function animateIntro(){
+    setTimeout(()=>{ logo.style.opacity=1; }, 500);
+    setTimeout(()=>{ subtext.style.opacity=1; }, 2500);
+    setTimeout(()=>{ drawLightning(lightning1,"white"); },3000);
+    setTimeout(()=>{ drawLightning(lightning2,"red"); },3800);
+    setTimeout(()=>{
+        intro.style.display="none";
+        calculator.style.display="block";
+        updateBest();
+    },6000);
+}
+
+animateIntro();
+
+// ===== KALKULAČKA =====
+function add(v){ display.value += v; }
+function clearDisp(){ display.value = ""; }
+
+function equals(){
+    if(display.value === "80085"){
+        calculator.style.display = "none";
+        game.style.display = "block";
+        startGame();
+        return;
+    }
+    if(!/^[0-9+\-*/.]+$/.test(display.value)){
+        display.value = "ERROR";
+        setTimeout(clearDisp,800);
+        return;
+    }
+    try{ display.value = eval(display.value); } catch{ display.value="ERROR"; setTimeout(clearDisp,800);}
+}
+
+// ===== HRA =====
+let player, platforms, score, waitingForStart=true, powerups=[], powerupTimer;
+const gravity=0.6;
+
+function startGame(){
+    player = { x:140, y:400, vy:0, w:40, h:40, img:new Image() };
+    player.img.src = "icon.png";
+    score = 0;
+    platforms = [];
+    powerups = [];
+    waitingForStart = true;
+    for(let i=0;i<6;i++){
+        platforms.push({x:Math.random()*220, y:i*80, w:80, h:10, type:Math.random()<0.5?"static":"moving", dir:1});
+    }
+    spawnPowerup();
+    gameOverEl.style.display="none";
+    resetBtn.style.display="none";
+    hint.style.display="block";
+    loop();
+}
+
+function loop(){
+    ctx.clearRect(0,0,300,500);
+    drawBackground();
+
+    if(player && !waitingForStart){ player.vy += gravity; player.y += player.vy; }
+
+    platforms.forEach(p=>{
+        if(!waitingForStart && p.type==="moving"){
+            p.x += p.dir*2;
+            if(p.x<0 || p.x+p.w>300) p.dir*=-1;
+        }
+        if(!waitingForStart) p.y += 1 + score/50;
+
+        if(player && !waitingForStart && player.vy>0 && player.y+player.h>p.y && player.y+player.h<p.y+p.h && player.x+player.w>p.x && player.x<p.x+p.w){
+            player.vy = -12; score++; scoreEl.innerText = "Skóre: "+score; updateBest();
+        }
+
+        if(p.y>500){ p.y=0; p.x=Math.random()*220; }
+
+        ctx.fillStyle="lime"; ctx.fillRect(p.x,p.y,p.w,p.h);
+    });
+
+    powerups.forEach((pu,i)=>{
+        ctx.fillStyle="cyan";
+        ctx.beginPath();
+        ctx.arc(pu.x, pu.y, 10, 0, Math.PI*2);
+        ctx.fill();
+        if(player && player.x+player.w>pu.x-10 && player.x<pu.x+10 && player.y+player.h>pu.y-10 && player.y<pu.y+10){
+            score += 5;
+            powerups.splice(i,1);
+            scoreEl.innerText="Skóre: "+score;
+            updateBest();
+        }
+    });
+
+    if(player) ctx.drawImage(player.img, player.x, player.y, player.w, player.h);
+
+    if(player && player.y>520){
+        gameOverEl.style.display="block";
+        resetBtn.style.display="block";
+        localStorage.setItem("bestScore", Math.max(score, localStorage.getItem("bestScore")||0));
+        return;
+    }
+
+    requestAnimationFrame(loop);
+}
+
+function drawBackground(){
+    const gradient = ctx.createLinearGradient(0,0,0,500);
+    gradient.addColorStop(0,"#0a0a0a");
+    gradient.addColorStop(0.5,"#222");
+    gradient.addColorStop(1,"#444");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,300,500);
+}
+
+function spawnPowerup(){
+    powerups.push({x:Math.random()*280, y:-50});
+    powerupTimer = setTimeout(spawnPowerup,5000);
+}
+
+function resetGame(){
+    clearTimeout(powerupTimer);
+    gameOverEl.style.display="none";
+    resetBtn.style.display="none";
+    startGame();
+    hint.style.display="block";
+}
+
+function updateBest(){
+    const best = Math.max(score, localStorage.getItem("bestScore")||0);
+    localStorage.setItem("bestScore", best);
+    bestEl.innerText = "Nejlepší: "+best;
+}
+
+// ===== OVLÁDÁNÍ =====
+document.addEventListener("keydown", e=>{
+    if(!player) return;
+    if(e.key==="ArrowLeft") player.x = Math.max(0, player.x-15);
+    if(e.key==="ArrowRight") player.x = Math.min(260, player.x+15);
+    if(e.key===" "||e.key==="ArrowUp"){ waitingForStart=false; hint.style.display="none"; player.vy=-12; }
+});
+
+document.addEventListener("touchstart", e=>{
+    if(!player) return;
+    let x=e.touches[0].clientX;
+    if(x<window.innerWidth/2) player.x = Math.max(0, player.x-20); else player.x = Math.min(260, player.x+20);
+    waitingForStart=false; hint.style.display="none"; player.vy=-12;
+});
+
+// ===== PWA SERVICE WORKER =====
+if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("service-worker.js")
+        .then(()=>console.log("SW registrován"))
+        .catch(err=>console.log("SW error",err));
+}
+    </script>
+</body>
+</html>
